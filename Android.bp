@@ -28,10 +28,13 @@ android_app {
     static_libs: [
         "androidx.annotation_annotation",
         "androidx.core_core",
-        "org.lineageos.lib.phone",
     ],
     libs: [
         "services",
+        "org.lineageos.lib.phone",
+    ],
+    uses_libs: [
+        "org.lineageos.lib.phone",
     ],
     resource_dirs: ["res"],
     proto: {
