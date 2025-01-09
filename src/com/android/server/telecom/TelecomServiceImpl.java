@@ -80,6 +80,8 @@ import com.android.internal.telecom.ICallControl;
 import com.android.internal.telecom.ICallEventCallback;
 import com.android.internal.telecom.ITelecomService;
 import com.android.internal.util.IndentingPrintWriter;
+import com.android.server.telecom.callsequencing.voip.OutgoingCallTransactionSequencing;
+import com.android.server.telecom.callsequencing.voip.VoipCallMonitor;
 import com.android.server.telecom.components.UserCallIntentProcessorFactory;
 import com.android.server.telecom.flags.FeatureFlags;
 import com.android.server.telecom.metrics.ApiStats;
@@ -166,6 +168,23 @@ public class TelecomServiceImpl {
     private final CallsManager mCallsManager;
     private TransactionManager mTransactionManager;
     private final ITelecomService.Stub mBinderImpl = new ITelecomService.Stub() {
+
+        @Override
+        public boolean hasForegroundServiceDelegation(
+                PhoneAccountHandle handle,
+                String packageName) {
+            enforceCallingPackage(packageName, "hasForegroundServiceDelegation");
+            long token = Binder.clearCallingIdentity();
+            try {
+                VoipCallMonitor vcm = mCallsManager.getVoipCallMonitor();
+                if (vcm != null) {
+                    return vcm.hasForegroundServiceDelegation(handle);
+                }
+                return false;
+            } finally {
+                Binder.restoreCallingIdentity(token);
+            }
+        }
 
         @Override
         public void addCall(CallAttributes callAttributes, ICallEventCallback callEventCallback,
@@ -1471,12 +1490,16 @@ public class TelecomServiceImpl {
         private boolean isPrivilegedUid() {
             int callingUid = Binder.getCallingUid();
             return mFeatureFlags.allowSystemAppsResolveVoipCalls()
-                    ? (UserHandle.isSameApp(callingUid, Process.ROOT_UID)
-                            || UserHandle.isSameApp(callingUid, Process.SYSTEM_UID)
-                            || UserHandle.isSameApp(callingUid, Process.SHELL_UID))
+                    ? (isSameApp(callingUid, Process.ROOT_UID)
+                            || isSameApp(callingUid, Process.SYSTEM_UID)
+                            || isSameApp(callingUid, Process.SHELL_UID))
                     : (callingUid == Process.ROOT_UID
                             || callingUid == Process.SYSTEM_UID
                             || callingUid == Process.SHELL_UID);
+        }
+
+        private boolean isSameApp(int uid1, int uid2) {
+            return UserHandle.getAppId(uid1) == UserHandle.getAppId(uid2);
         }
 
         private boolean isSysUiUid() {
@@ -1487,7 +1510,7 @@ public class TelecomServiceImpl {
                     systemUiUid = mPackageManager.getPackageUid(mSystemUiPackageName, 0);
                     Log.i(TAG, "isSysUiUid: callingUid = " + callingUid + "; systemUiUid = "
                             + systemUiUid);
-                    return UserHandle.isSameApp(callingUid, systemUiUid);
+                    return isSameApp(callingUid, systemUiUid);
                 } catch (PackageManager.NameNotFoundException e) {
                     Log.w(TAG, "isSysUiUid: caught PackageManager NameNotFoundException = " + e);
                     return false;
