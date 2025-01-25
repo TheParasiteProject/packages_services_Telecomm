@@ -36,6 +36,7 @@ import com.android.internal.os.SomeArgs;
 import com.android.internal.util.IState;
 import com.android.internal.util.State;
 import com.android.internal.util.StateMachine;
+import com.android.server.telecom.AudioRoute;
 import com.android.server.telecom.CallAudioCommunicationDeviceTracker;
 import com.android.server.telecom.TelecomSystem;
 import com.android.server.telecom.Timeouts;
@@ -1177,6 +1178,11 @@ public class BluetoothRouteManager extends StateMachine {
     @VisibleForTesting
     public boolean isInbandRingEnabled(BluetoothDevice bluetoothDevice) {
         return mDeviceManager.isInbandRingEnabled(bluetoothDevice);
+    }
+
+    public boolean isInbandRingEnabled(@AudioRoute.AudioRouteType int audioRouteType,
+            BluetoothDevice bluetoothDevice) {
+        return mDeviceManager.isInbandRingEnabled(audioRouteType, bluetoothDevice);
     }
 
     private boolean addDevice(String address) {
