@@ -3497,8 +3497,7 @@ public class Call implements CreateConnectionResponse, EventManager.Loggable,
         return Contacts.getLookupUri(mCallerInfo.getContactId(), mCallerInfo.lookupKey);
     }
 
-    @VisibleForTesting
-    public Uri getRingtone() {
+    Uri getRingtone() {
         return mCallerInfo == null ? null : mCallerInfo.contactRingtoneUri;
     }
 
