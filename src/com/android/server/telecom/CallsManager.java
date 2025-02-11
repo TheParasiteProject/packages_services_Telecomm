@@ -1828,6 +1828,24 @@ public class CallsManager extends Call.ListenerBase
             } else {
                 notifyCreateConnectionFailed(phoneAccountHandle, call);
             }
+        } else if (mFeatureFlags.enableCallSequencing() && (hasMaximumManagedRingingCalls(call)
+                || hasMaximumManagedDialingCalls(call))) {
+            // Fail incoming call if there's already a ringing or dialing call present.
+            boolean maxRinging = hasMaximumManagedRingingCalls(call);
+            if (maxRinging) {
+                call.setMissedReason(AUTO_MISSED_MAXIMUM_RINGING);
+                call.setStartFailCause(CallFailureCause.MAX_RINGING_CALLS);
+            } else {
+                call.setMissedReason(AUTO_MISSED_MAXIMUM_DIALING);
+            }
+            call.getAnalytics().setMissedReason(call.getMissedReason());
+            mCallLogManager.logCall(call, Calls.MISSED_TYPE,
+                    true /*showNotificationForMissedCall*/, null /*CallFilteringResult*/);
+            if (isConference) {
+                notifyCreateConferenceFailed(phoneAccountHandle, call);
+            } else {
+                notifyCreateConnectionFailed(phoneAccountHandle, call);
+            }
         } else if (call.isTransactionalCall()) {
             // transactional calls should skip Call#startCreateConnection below
             // as that is meant for Call objects with a ConnectionServiceWrapper
@@ -3544,6 +3562,9 @@ public class CallsManager extends Call.ListenerBase
      */
     public void disconnectCallOld(Call call, int previousState) {
         call.disconnect();
+        for (CallsManagerListener listener : mListeners) {
+            listener.onCallStateChanged(call, previousState, call.getState());
+        }
         processDisconnectCallAndCleanup(call, previousState);
     }
 
@@ -3554,9 +3575,6 @@ public class CallsManager extends Call.ListenerBase
      * @param previousState The previous call state before the call is disconnected.
      */
     public void processDisconnectCallAndCleanup(Call call, int previousState) {
-        for (CallsManagerListener listener : mListeners) {
-            listener.onCallStateChanged(call, previousState, call.getState());
-        }
         // Cancel any of the outgoing call futures if they're still around.
         if (mPendingCallConfirm != null && !mPendingCallConfirm.isDone()) {
             mPendingCallConfirm.complete(null);
