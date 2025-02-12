@@ -926,6 +926,28 @@ public class CallSequencingController {
         return false;
     }
 
+    public void maybeAddAnsweringCallDropsFg(Call activeCall, Call incomingCall) {
+        // Don't set the extra when we have an incoming self-managed call that would potentially
+        // disconnect the active managed call.
+        if (activeCall == null || (incomingCall.isSelfManaged() && !activeCall.isSelfManaged())) {
+            return;
+        }
+        // Check if the active call doesn't support hold. If it doesn't we should indicate to the
+        // user via the EXTRA_ANSWERING_DROPS_FG_CALL extra that the call would be dropped by
+        // answering the incoming call.
+        if (!mCallsManager.supportsHold(activeCall)) {
+            CharSequence droppedApp = activeCall.getTargetPhoneAccountLabel();
+            Bundle dropCallExtras = new Bundle();
+            dropCallExtras.putBoolean(Connection.EXTRA_ANSWERING_DROPS_FG_CALL, true);
+
+            // Include the name of the app which will drop the call.
+            dropCallExtras.putCharSequence(
+                    Connection.EXTRA_ANSWERING_DROPS_FG_CALL_APP_NAME, droppedApp);
+            Log.i(this, "Incoming call will drop %s call.", droppedApp);
+            incomingCall.putConnectionServiceExtras(dropCallExtras);
+        }
+    }
+
     private void showErrorDialogForMaxOutgoingCall(Call call) {
         int resourceId = R.string.callFailed_too_many_calls;
         String reason = " there are two calls already in progress. Disconnect one of the calls "
