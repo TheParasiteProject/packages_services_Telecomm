@@ -131,6 +131,10 @@ public class Call implements CreateConnectionResponse, EventManager.Loggable,
 
     private static final char NO_DTMF_TONE = '\0';
 
+    public static final int CALL_SIMULTANEOUS_UNKNOWN = 0;
+    public static final int CALL_SIMULTANEOUS_SINGLE = 1;
+    public static final int CALL_DIRECTION_DUAL_SAME_ACCOUNT = 2;
+    public static final int CALL_DIRECTION_DUAL_DIFF_ACCOUNT = 3;
 
     /**
      * Listener for CallState changes which can be leveraged by a Transaction.
@@ -500,6 +504,11 @@ public class Call implements CreateConnectionResponse, EventManager.Loggable,
      * an emergency call being placed.
      */
     private DisconnectCause mOverrideDisconnectCause = new DisconnectCause(DisconnectCause.UNKNOWN);
+
+    /**
+     * Simultaneous type of the call.
+     */
+    private int mSimultaneousType = CALL_SIMULTANEOUS_UNKNOWN;
 
     private Bundle mIntentExtras = new Bundle();
 
@@ -5063,5 +5072,13 @@ public class Call implements CreateConnectionResponse, EventManager.Loggable,
                 listener.onCallStreamingStateChanged(this, false /** isStreaming */);
             }
         }
+    }
+
+    public void setSimultaneousType(int simultaneousType) {
+        mSimultaneousType = simultaneousType;
+    }
+
+    public int getSimultaneousType() {
+        return mSimultaneousType;
     }
 }
