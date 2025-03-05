@@ -432,7 +432,10 @@ public class CallsManager extends Call.ListenerBase
             new ConcurrentHashMap<>();
 
     private CompletableFuture<Call> mPendingCallConfirm;
-    private CompletableFuture<Pair<Call, PhoneAccountHandle>> mPendingAccountSelection;
+    // Map the call's id to the corresponding pending account selection future associated with the
+    // call.
+    private final Map<String, CompletableFuture<Pair<Call, PhoneAccountHandle>>>
+            mPendingAccountSelection;
 
     // Instance variables for testing -- we keep the latest copy of the outgoing call futures
     // here so that we can wait on them in tests
@@ -858,6 +861,7 @@ public class CallsManager extends Call.ListenerBase
         mCallAnomalyWatchdog = callAnomalyWatchdog;
         mAsyncTaskExecutor = asyncTaskExecutor;
         mUserManager = mContext.getSystemService(UserManager.class);
+        mPendingAccountSelection = new HashMap<>();
     }
 
     public void setIncomingCallNotifier(IncomingCallNotifier incomingCallNotifier) {
@@ -2420,11 +2424,12 @@ public class CallsManager extends Call.ListenerBase
                                     android.telecom.Call.EXTRA_SUGGESTED_PHONE_ACCOUNTS,
                                     accountSuggestions);
                             // Set a future in place so that we can proceed once the dialer replies.
-                            mPendingAccountSelection = new CompletableFuture<>();
+                            mPendingAccountSelection.put(callToPlace.getId(),
+                                    new CompletableFuture<>());
                             callToPlace.setIntentExtras(newExtras);
 
                             addCall(callToPlace);
-                            return mPendingAccountSelection;
+                            return mPendingAccountSelection.get(callToPlace.getId());
                         }, new LoggedHandlerExecutor(outgoingCallHandler, "CM.dSPA", mLock));
 
         // Potentially perform call identification for dialed TEL scheme numbers.
@@ -3586,10 +3591,12 @@ public class CallsManager extends Call.ListenerBase
             mPendingCallConfirm.complete(null);
             mPendingCallConfirm = null;
         }
-        if (mPendingAccountSelection != null && !mPendingAccountSelection.isDone()) {
-            mPendingAccountSelection.complete(null);
-            mPendingAccountSelection = null;
+        String callId = call.getId();
+        if (mPendingAccountSelection.containsKey(callId)
+                && !mPendingAccountSelection.get(callId).isDone()) {
+            mPendingAccountSelection.get(callId).complete(null);
         }
+        mPendingAccountSelection.remove(callId);
     }
     /**
      * Disconnects calls for any other {@link PhoneAccountHandle} but the one specified.
@@ -3984,9 +3991,10 @@ public class CallsManager extends Call.ListenerBase
                         .setUserSelectedOutgoingPhoneAccount(account, call.getAssociatedUser());
             }
 
-            if (mPendingAccountSelection != null) {
-                mPendingAccountSelection.complete(Pair.create(call, account));
-                mPendingAccountSelection = null;
+            String callId = call.getId();
+            if (mPendingAccountSelection.containsKey(callId)) {
+                mPendingAccountSelection.get(callId).complete(Pair.create(call, account));
+                mPendingAccountSelection.remove(callId);
             }
         }
     }
@@ -7173,5 +7181,11 @@ public class CallsManager extends Call.ListenerBase
                 Log.w(this, e.toString());
             }
         }
+    }
+
+    @VisibleForTesting
+    public Map<String, CompletableFuture<Pair<Call, PhoneAccountHandle>>>
+    getPendingAccountSelection() {
+        return mPendingAccountSelection;
     }
 }
