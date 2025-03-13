@@ -644,6 +644,7 @@ public class Call implements CreateConnectionResponse, EventManager.Loggable,
 
     private boolean mIsTransactionalCall = false;
     private CallingPackageIdentity mCallingPackageIdentity = new CallingPackageIdentity();
+    private boolean mSkipAutoUnhold = false;
 
     /**
      * CallingPackageIdentity is responsible for storing properties about the calling package that
@@ -5107,5 +5108,22 @@ public class Call implements CreateConnectionResponse, EventManager.Loggable,
 
     public boolean hasVideoCall() {
         return mHasVideoCall;
+    }
+
+    /**
+     * Used only for call sequencing for cases when we may end up auto-unholding the held call while
+     * processing an outgoing (emergency) call. We want to refrain from unholding the held call so
+     * that we don't end up with two active calls. Once the outgoing call is disconnected (either
+     * from a successful disconnect by the user or a failed call), the auto-unhold logic will be
+     * triggered again and successfully unhold the held call at that point. Note, that this only
+     * applies to non-holdable phone accounts (i.e. Verizon). Refer to
+     * {@link CallsManagerCallSequencingAdapter#maybeMoveHeldCallToForeground} for details.
+     */
+    public void setSkipAutoUnhold(boolean result) {
+        mSkipAutoUnhold = result;
+    }
+
+    public boolean getSkipAutoUnhold() {
+        return mSkipAutoUnhold;
     }
 }
