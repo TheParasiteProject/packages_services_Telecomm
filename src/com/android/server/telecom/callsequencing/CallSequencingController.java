@@ -761,7 +761,7 @@ public class CallSequencingController {
                         "Disconnecting call in SELECT_PHONE_ACCOUNT in favor of new "
                                 + "outgoing call.");
             }
-            showErrorDialogForMaxOutgoingCall(call);
+            showErrorDialogForMaxOutgoingCallOutgoingPresent(call);
             return CompletableFuture.completedFuture(false);
         }
 
@@ -778,7 +778,9 @@ public class CallSequencingController {
         // different failure cause. Now, we perform this early check to ensure the right max
         // outgoing call restriction error is displayed instead.
         if (mCallsManager.hasMaximumManagedHoldingCalls(call) && !mCallsManager.canHold(liveCall)) {
-            showErrorDialogForMaxOutgoingCall(call);
+            Call heldCall = mCallsManager.getFirstCallWithState(CallState.ON_HOLD);
+            showErrorDialogForMaxOutgoingCallTooManyCalls(call,
+                    arePhoneAccountsSame(heldCall, liveCall));
             return CompletableFuture.completedFuture(false);
         }
 
@@ -1101,10 +1103,20 @@ public class CallSequencingController {
         }
     }
 
-    private void showErrorDialogForMaxOutgoingCall(Call call) {
-        int resourceId = R.string.callFailed_too_many_calls;
-        String reason = " there are two calls already in progress. Disconnect one of the calls "
-                + "or merge the calls.";
+    private void showErrorDialogForMaxOutgoingCallOutgoingPresent(Call call) {
+        int resourceId = R.string.callFailed_outgoing_already_present;
+        String reason = " there is already another call connecting. Wait for the "
+                + "call to be answered or disconnect before placing another call.";
+        showErrorDialogForFailedCall(call, CallFailureCause.MAX_OUTGOING_CALLS, resourceId, reason);
+    }
+
+    private void showErrorDialogForMaxOutgoingCallTooManyCalls(
+            Call call, boolean arePhoneAccountsSame) {
+        int resourceId = arePhoneAccountsSame
+                ? R.string.callFailed_too_many_calls_include_merge
+                : R.string.callFailed_too_many_calls_exclude_merge;
+        String reason = " there are two calls already in progress. Disconnect one "
+                + "of the calls or merge the calls (if possible).";
         showErrorDialogForFailedCall(call, CallFailureCause.MAX_OUTGOING_CALLS, resourceId, reason);
     }
 
