@@ -74,6 +74,7 @@ import android.media.AudioDeviceInfo;
 import android.media.AudioManager;
 import android.media.IAudioService;
 import android.media.audiopolicy.AudioProductStrategy;
+import android.os.Looper;
 import android.os.UserHandle;
 import android.telecom.CallAudioState;
 import android.telecom.VideoProfile;
@@ -216,13 +217,17 @@ public class CallAudioRouteControllerTest extends TelecomTestCase {
         when(mFeatureFlags.resolveActiveBtRoutingAndBtTimingIssue()).thenReturn(false);
         when(mFeatureFlags.newAudioPathSpeakerBroadcastAndUnfocusedRouting()).thenReturn(false);
         when(mFeatureFlags.fixUserRequestBaselineRouteVideoCall()).thenReturn(false);
+        when(mFeatureFlags.callAudioRoutingPerformanceImprovemenent()).thenReturn(true);
         BLUETOOTH_DEVICES.add(BLUETOOTH_DEVICE_1);
     }
 
     @After
     public void tearDown() throws Exception {
-        mController.getAdapterHandler().getLooper().quit();
-        mController.getAdapterHandler().getLooper().getThread().join();
+        Looper looper = mController.getAdapterHandler().getLooper();
+        if (looper != Looper.getMainLooper()) {
+            mController.getAdapterHandler().getLooper().quit();
+            mController.getAdapterHandler().getLooper().getThread().join();
+        }
         BLUETOOTH_DEVICES.clear();
         super.tearDown();
     }
