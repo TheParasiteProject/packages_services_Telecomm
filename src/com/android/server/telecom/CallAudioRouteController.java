@@ -37,6 +37,7 @@ import android.media.IAudioService;
 import android.media.audiopolicy.AudioProductStrategy;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.Looper;
 import android.os.Message;
 import android.os.RemoteException;
 import android.telecom.CallAudioState;
@@ -213,7 +214,9 @@ public class CallAudioRouteController implements CallAudioRouteAdapter {
 
         mTelecomLock = callsManager.getLock();
         HandlerThread handlerThread = new HandlerThread(this.getClass().getSimpleName());
-        handlerThread.start();
+        if (!mFeatureFlags.callAudioRoutingPerformanceImprovemenent()) {
+            handlerThread.start();
+        }
 
         // Register broadcast receivers
         if (!mFeatureFlags.newAudioPathSpeakerBroadcastAndUnfocusedRouting()) {
@@ -253,8 +256,11 @@ public class CallAudioRouteController implements CallAudioRouteAdapter {
             }
         };
 
+        Looper looper = mFeatureFlags.callAudioRoutingPerformanceImprovemenent()
+                ? Looper.getMainLooper()
+                : handlerThread.getLooper();
         // Create handler
-        mHandler = new Handler(handlerThread.getLooper()) {
+        mHandler = new Handler(looper) {
             @Override
             public void handleMessage(@NonNull Message msg) {
                 synchronized (this) {
