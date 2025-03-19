@@ -903,7 +903,7 @@ public class CallSequencingController {
         CompletableFuture<Boolean> disconnectFuture = CompletableFuture.completedFuture(true);
         for (Call call: mCallsManager.getCalls()) {
             // Conditions for checking if call doesn't need to be disconnected immediately.
-            boolean isManaged = isManagedCall(call);
+            boolean isVoip = isVoipCall(call);
             boolean callSupportsHold = call.can(Connection.CAPABILITY_SUPPORT_HOLD);
             boolean callSupportsHoldingEmergencyCall = shouldHoldForEmergencyCall(
                     call.getTargetPhoneAccount());
@@ -913,9 +913,9 @@ public class CallSequencingController {
                 continue;
             }
 
-            // If the call is managed and supports holding + capability to place emergency calls,
+            // If the call is not VOIP and supports holding + capability to place emergency calls,
             // don't disconnect the call.
-            if (isManaged && callSupportsHoldingEmergencyCall) {
+            if (!isVoip && callSupportsHoldingEmergencyCall) {
                 // If call supports hold, we can skip. Other condition we check here is if calls
                 // are on single sim, in which case we will refrain from disconnecting a potentially
                 // held call (i.e. Verizon ACTIVE + HOLD case) here and let that be determined later
@@ -926,7 +926,7 @@ public class CallSequencingController {
             }
 
             Log.i(this, "Disconnecting call (%s). isManaged: %b, call supports hold: %b, call "
-                            + "supports holding emergency call: %b", call.getId(), isManaged,
+                            + "supports holding emergency call: %b", call.getId(), !isVoip,
                     callSupportsHold, callSupportsHoldingEmergencyCall);
             emergencyCall.getAnalytics().setCallIsAdditional(true);
             call.getAnalytics().setCallIsInterrupted(true);
@@ -1159,6 +1159,6 @@ public class CallSequencingController {
         if (call == null) {
             return false;
         }
-        return !call.isSelfManaged() && !call.isTransactionalCall();
+        return !call.isSelfManaged() && !call.isTransactionalCall() && !call.isExternalCall();
     }
 }
