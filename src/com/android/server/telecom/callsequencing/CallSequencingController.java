@@ -292,7 +292,7 @@ public class CallSequencingController {
                     // and the held call is a carrier call, then disconnect the held call. The
                     // idea is that if we have a held carrier call and the incoming call is a
                     // VOIP call, we don't want to force the carrier call to auto-disconnect).
-                    if (!heldCall.isSelfManaged() && call.isSelfManaged()) {
+                    if (isManagedCall(heldCall) && isVoipCall(call)) {
                         // Otherwise, fail the transaction.
                         return CompletableFuture.completedFuture(false);
                     } else {
@@ -343,8 +343,8 @@ public class CallSequencingController {
                     // We don't want to allow VOIP apps to disconnect carrier calls. We are
                     // purposely completing the future with false so that the call isn't
                     // answered.
-                    if (isSequencingRequiredActiveAndCall && call.isSelfManaged()
-                            && !activeCall.isSelfManaged()) {
+                    if (isSequencingRequiredActiveAndCall && isVoipCall(call)
+                            && isManagedCall(activeCall)) {
                         Log.w(this, "holdActiveCallForNewCallWithSequencing: ignore "
                                 + "disconnecting carrier call for making VOIP call active");
                         return CompletableFuture.completedFuture(false);
@@ -707,7 +707,7 @@ public class CallSequencingController {
     private CompletableFuture<Boolean> makeRoomForOutgoingCall(Call call) {
         // For the purely managed CS cases, check if there's a ringing call, in which case we will
         // disallow the outgoing call.
-        if (!call.isSelfManaged() && mCallsManager.hasManagedRingingOrSimulatedRingingCall()) {
+        if (isManagedCall(call) && mCallsManager.hasManagedRingingOrSimulatedRingingCall()) {
             showErrorDialogForOutgoingDuringRingingCall(call);
             return CompletableFuture.completedFuture(false);
         }
@@ -787,7 +787,7 @@ public class CallSequencingController {
         // Self-Managed + Transactional calls require Telecom to manage calls in the same
         // PhoneAccount, whereas managed calls require the ConnectionService to manage calls in the
         // same PhoneAccount for legacy reasons (Telephony).
-        if (arePhoneAccountsSame(call, liveCall) && !call.isSelfManaged()) {
+        if (arePhoneAccountsSame(call, liveCall) && isManagedCall(call)) {
             Log.i(this, "makeRoomForOutgoingCall: allowing managed CS to handle "
                     + "calls from the same self-managed account");
             return CompletableFuture.completedFuture(true);
@@ -903,7 +903,7 @@ public class CallSequencingController {
         CompletableFuture<Boolean> disconnectFuture = CompletableFuture.completedFuture(true);
         for (Call call: mCallsManager.getCalls()) {
             // Conditions for checking if call doesn't need to be disconnected immediately.
-            boolean isManaged = !call.isSelfManaged() && !call.isTransactionalCall();
+            boolean isManaged = isManagedCall(call);
             boolean callSupportsHold = call.can(Connection.CAPABILITY_SUPPORT_HOLD);
             boolean callSupportsHoldingEmergencyCall = shouldHoldForEmergencyCall(
                     call.getTargetPhoneAccount());
@@ -1084,7 +1084,7 @@ public class CallSequencingController {
     public void maybeAddAnsweringCallDropsFg(Call activeCall, Call incomingCall) {
         // Don't set the extra when we have an incoming self-managed call that would potentially
         // disconnect the active managed call.
-        if (activeCall == null || (incomingCall.isSelfManaged() && !activeCall.isSelfManaged())) {
+        if (activeCall == null || (isVoipCall(incomingCall) && isManagedCall(activeCall))) {
             return;
         }
         // Check if the active call doesn't support hold. If it doesn't we should indicate to the
@@ -1146,5 +1146,19 @@ public class CallSequencingController {
 
     public Handler getHandler() {
         return mHandler;
+    }
+
+    private boolean isVoipCall(Call call) {
+        if (call == null) {
+            return false;
+        }
+        return call.isSelfManaged() || call.isTransactionalCall();
+    }
+
+    private boolean isManagedCall(Call call) {
+        if (call == null) {
+            return false;
+        }
+        return !call.isSelfManaged() && !call.isTransactionalCall();
     }
 }
