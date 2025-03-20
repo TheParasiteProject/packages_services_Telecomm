@@ -234,6 +234,16 @@ public class CallsManagerCallSequencingAdapter {
     public void maybeMoveHeldCallToForeground(Call removedCall, boolean isLocallyDisconnecting) {
         CompletableFuture<Boolean> unholdForegroundCallFuture = null;
         Call foregroundCall = mCallAudioManager.getPossiblyHeldForegroundCall();
+        // There are some cases (non-holdable calls) where we may want to skip auto-unholding when
+        // we're processing a new outgoing call and waiting for it to go active. Skip the
+        // auto-unholding in this case so that we don't end up with two active calls. If the new
+        // call fails, we will auto-unhold on that removed call. This is only set in
+        // CallSequencingController because the legacy code doesn't wait for disconnects to occur
+        // in order to place an outgoing (emergency) call, so we don't see this issue.
+        if (removedCall.getSkipAutoUnhold()) {
+            return;
+        }
+
         if (isLocallyDisconnecting) {
             boolean isDisconnectingChildCall = removedCall.isDisconnectingChildCall();
             Log.v(this, "maybeMoveHeldCallToForeground: isDisconnectingChildCall = "
@@ -247,7 +257,6 @@ public class CallsManagerCallSequencingAdapter {
             if (!isDisconnectingChildCall && foregroundCall != null
                     && foregroundCall.getState() == CallState.ON_HOLD
                     && CallsManager.areFromSameSource(foregroundCall, removedCall)) {
-
                 unholdForegroundCallFuture = foregroundCall.unhold();
             }
         } else if (foregroundCall != null &&
